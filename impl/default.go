@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"github.com/xtraclabs/appreg/domain"
 )
 
 type Default struct {
@@ -48,8 +49,19 @@ func ApplicationsPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println("name", parsed["name"])
-	log.Println("description", parsed["description"])
+	name, ok := parsed["name"].(string)
+	if !ok {
+		http.Error(w, "Unable to extract name parameter from request payload", http.StatusInternalServerError)
+	}
+
+	desc, ok := parsed["description"].(string)
+	if !ok {
+		http.Error(w, "Unable to extract description parameter from request payload", http.StatusInternalServerError)
+	}
+
+
+	appReg,_ := domain.NewApplicationReg(name, desc)
+	log.Println(appReg)
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)

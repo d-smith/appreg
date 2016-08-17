@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package domain;
 
-message TestAggCreated {
+message ApplicationRegistrationCreated {
     string aggregateId = 1;
     string name = 2;
     string description = 3;
