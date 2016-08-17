@@ -1,9 +1,9 @@
 package impl
 
 import (
-	"net/http"
 	"fmt"
 	"github.com/gorilla/mux"
+	"net/http"
 )
 
 type Route struct {
@@ -78,5 +78,4 @@ var routes = Routes{
 		"/xtrac/devcenter/applications",
 		ApplicationsPost,
 	},
-
 }

@@ -1,0 +1,289 @@
+swagger: '2.0'
+
+# docker run -p 8080:8080 swaggerapi/swagger-editor
+
+# This specification for providing details behind the dev center stories
+# for the developer experience. The services should not be implemented
+# verbatim from the specification, this is merely the starting point for
+# the service design.
+
+info:
+  version: "initial specification"
+  title: XTRAC Dev Center Services
+
+basePath: /xtrac/devcenter
+
+consumes:
+- application/json
+
+produces:
+- application/json
+
+
+# Initially, to secure the dev center, we'll register a client application with the API
+# 1.0 login service, and restrict API callers to the dev center audience. We will
+# extract the identity of the caller using the sub claim in the JWT. The security
+# token in the security definitions below is the bearer token in the
+# Authorization header. At some point we'll transition this to a pre-registered
+# application that uses the managed API Oauth2 flows for login, with the SSO
+# login method.
+
+securityDefinitions:
+  securityToken:
+    type: apiKey
+    name: Authorization
+    in: header
+
+security:
+  - securityToken: []
+
+paths:
+
+  /applications:
+    get:
+      description: |
+        Gets application summaries for the applications owned by a user.
+        The user for this service is obtained from the JWT sub claim.
+
+      responses:
+        200:
+          description: Successful response
+          schema:
+            $ref: '#/definitions/ApplicationSummariesResponse'
+        400:
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        401:
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+
+    post:
+      description: |
+        Create a new application registration using the details posted
+        in the request body. The owner for the application registered
+        using this service is the sub claim in the bearer token JWT.
+
+      parameters:
+        -
+          name: request
+          required: true
+          in: body
+          schema:
+            $ref: '#/definitions/ApplicationSpec'
+
+      responses:
+        200:
+          description: Application registered successfully
+          schema:
+            $ref: '#/definitions/AppRegistrationResponse'
+        400:
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        401:
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+
+
+  /applications/{client_id}:
+    get:
+      description: |
+        Retrieve application detail. Initially, only the creator of an application
+        may retrieve the application detail, which means the sub needs to be
+        the as the creator or a 401 is returned.
+
+      parameters:
+        - name: client_id
+          in: path
+          description: |
+            Client id used for authentication flows which also uniquely
+            identifies the application
+          required: true
+          type: string
+
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: '#/definitions/ApplicationDetailResponse'
+        400:
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        401:
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        404:
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+
+    put:
+      description: |
+        Update application detail. Initially only the creator of an application
+        registration my update the application detail, which means the subject
+        in the access token (sub claim) must be the the same as the creator
+        recorded for the registration entry.
+
+      parameters:
+        - name: client_id
+          in: path
+          description: |
+            Client id used for authentication flows which also uniquely
+            identifies the application
+          required: true
+          type: string
+        - name: "application details"
+          in: body
+          description: Application details
+          schema:
+            $ref: '#/definitions/ApplicationSpec'
+
+      responses:
+        200:
+          description: Application registered successfully
+          schema:
+            $ref: '#/definitions/AppRegistrationResponse'
+        400:
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        401:
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        404:
+          description: Not Found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+
+
+
+  /applications/{client_id}/secret:
+    post:
+      description: |
+        Generate a secret for the given application. Initially, only the
+        owner may generate the secret, , which means the sub needs to be
+        the as the creator or a 401 is returned.. The application
+        does not store the secret, only the hash of the salted secret.
+
+      parameters:
+        - name: client_id
+          in: path
+          description: |
+            Client id used for authentication flows which also uniquely
+            identifies the application
+          required: true
+          type: string
+
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: '#/definitions/SecretResponse'
+        400:
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        401:
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        404:
+          description: No Found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+
+
+definitions:
+
+  ErrorResponse:
+    properties:
+      code:
+        type: integer
+      message:
+        type: string
+      details:
+        type: string
+        format: url
+
+
+  SecretResponse:
+    type: object
+    properties:
+      apiVersion:
+        type: string
+      data:
+        type: object
+        properties:
+          secret:
+            type: string
+            format: byte
+
+  ApplicationSpec:
+    required:
+      - name
+    properties:
+      name:
+        type: string
+      description:
+        type: string
+
+  ApplicationDetail:
+    properties:
+      name:
+        type: string
+      description:
+        type: string
+      client_id:
+        type: string
+
+  ApplicationDetailResponse:
+    type: object
+    properties:
+      apiVersion:
+        type: string
+      data:
+        $ref: '#/definitions/ApplicationDetail'
+
+  AppRegistrationResponse:
+    # Note we deviate from our naming standard to align with the OAuth2 client_id
+    # name.
+    type: object
+    properties:
+      apiVersion:
+        type: string
+      data:
+        type: object
+        properties:
+          client_id:
+            type: string
+
+
+  ApplicationSummary:
+    properties:
+      client_id:
+        type: string
+      name:
+        type: string
+      createDate:
+        type: string
+        format: Date
+
+  ApplicationSummaries:
+    type: array
+    items:
+      $ref: '#/definitions/ApplicationSummary'
+
+  ApplicationSummariesResponse:
+    type: object
+    properties:
+      apiVersion:
+        type: string
+      data:
+        $ref: '#/definitions/ApplicationSummaries'
+
