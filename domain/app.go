@@ -7,7 +7,6 @@ import (
 	"errors"
 	"github.com/golang/protobuf/proto"
 	"fmt"
-	"crypto/rand"
 )
 
 type ApplicationReg struct {
@@ -15,7 +14,12 @@ type ApplicationReg struct {
 	Name string
 	Description string
 	Created int64 //Unix time stamp serialized as an int64
-	ClientID string
+}
+
+func (ar *ApplicationReg) String() string {
+	ts := time.Unix(0,ar.Created).Format(time.RFC3339Nano)
+	return fmt.Sprintf("ID: %s, Name: %s, Description: %s, Created: %s",
+		ar.ID, ar.Name, ar.Description, ts)
 }
 
 const (
@@ -31,18 +35,11 @@ func NewApplicationReg(name, description string)(*ApplicationReg,error) {
 	appReg.Aggregate = goes.NewAggregate()
 	appReg.Version = 1
 
-	clientID, err := uuid()
-	if err != nil {
-		return nil,err
-	}
-
-
 	appRegCreated := ApplicationRegistrationCreated{
 		AggregateId: appReg.ID,
 		Name: name,
 		Description: description,
 		CreateTimestamp: time.Now().UnixNano(),
-		ClientID: clientID,
 	}
 
 	appReg.Apply(
@@ -54,6 +51,27 @@ func NewApplicationReg(name, description string)(*ApplicationReg,error) {
 
 	return appReg, nil
 }
+
+func NewApplicationRegFromHistory(events []goes.Event) *ApplicationReg {
+
+	log.Printf("New application reg from history - %d events\n", len(events))
+	appReg := new (ApplicationReg)
+	appReg.Aggregate = goes.NewAggregate()
+
+	unmarshalledEvents, err := unmarshallEvents(events)
+	if err != nil {
+		return nil
+	}
+
+	for _, e := range unmarshalledEvents {
+		log.Println("apply event", e)
+		appReg.Version += 1
+		appReg.Route(e)
+	}
+
+	return appReg
+}
+
 
 func (ar *ApplicationReg) Apply(event goes.Event) {
 	ar.Route(event)
@@ -76,7 +94,6 @@ func (ar *ApplicationReg) handleApplicationRegistrationCreated(event Application
 	ar.Name = event.Name
 	ar.Description = event.Description
 	ar.Created = event.CreateTimestamp
-	ar.ClientID = event.ClientID
 }
 
 func (ar *ApplicationReg) Store(eventStore goes.EventStore) error {
@@ -136,13 +153,35 @@ func marshallCreate(create ApplicationRegistrationCreated) ([]byte, error) {
 	return proto.Marshal(&create)
 }
 
-func uuid() (string, error) {
-	b := make([]byte, 16)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
+func unmarshallCreated(bytes []byte) (ApplicationRegistrationCreated, error) {
+	var payload ApplicationRegistrationCreated
+	err := proto.Unmarshal(bytes, &payload)
+	return payload, err
+}
+
+func unmarshallEvents(events []goes.Event) ([]goes.Event, error) {
+	var unmarshalled []goes.Event
+
+	for _, e := range events {
+
+		var err error
+		var newEvent goes.Event
+		newEvent.Source = e.Source
+		newEvent.Version = e.Version
+		newEvent.TypeCode = e.TypeCode
+
+		switch e.TypeCode {
+		case AppRegCreatedCode:
+			newEvent.Payload, err = unmarshallCreated(e.Payload.([]byte))
+			if err != nil {
+				return nil, err
+			}
+		default:
+			log.Println("Warning: unknown type code in event history", e.TypeCode)
+		}
+
+		unmarshalled = append(unmarshalled, newEvent)
 	}
 
-	return fmt.Sprintf("%X-%X-%X-%X-%X", b[0:4], b[4:6], b[6:8], b[8:10], b[10:]), nil
-
+	return unmarshalled, nil
 }

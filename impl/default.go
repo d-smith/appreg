@@ -9,6 +9,8 @@ import (
 	"github.com/xtraclabs/oraeventstore"
 	"os"
 	"strings"
+	"github.com/gorilla/mux"
+	"time"
 )
 
 var eventStore *oraeventstore.OraEventStore
@@ -56,9 +58,52 @@ func init() {
 
 }
 
+func buildGetByIdResponse(appReg *domain.ApplicationReg) ([]byte,error) {
+	response := make(map[string]interface{})
+	response["appVersion"] = "1.0"
+
+	data := make(map[string]interface{})
+	data["name"] = appReg.Name
+	data["description"] = appReg.Description
+	data["client_id"] = appReg.ID
+
+	created := time.Unix(0, appReg.Created).Format(time.RFC3339Nano)
+	data["created"] = created
+
+	response["data"] = data
+
+	return json.Marshal(response)
+}
+
 func ApplicationsClientIdGet(w http.ResponseWriter, r *http.Request) {
+	clientID := mux.Vars(r)["client_id"]
+	log.Printf("Read client id '%s'\n", clientID)
+
+	events, err := eventStore.RetrieveEvents(clientID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if len(events) == 0 {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	appReg := domain.NewApplicationRegFromHistory(events)
+
+	log.Println("Read app from event store...", appReg)
+
+	out, err := buildGetByIdResponse(appReg)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
+	w.Write(out)
 }
 
 func ApplicationsClientIdPut(w http.ResponseWriter, r *http.Request) {
@@ -105,8 +150,9 @@ func ApplicationsPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 
+	log.Println("create app with name and desc", name, desc)
 	appReg,_ := domain.NewApplicationReg(name, desc)
-	log.Println(appReg)
+	log.Println("storing...", appReg)
 
 	err = appReg.Store(eventStore)
 	if err != nil {
@@ -116,9 +162,9 @@ func ApplicationsPost(w http.ResponseWriter, r *http.Request) {
 
 
 	response := make(map[string]interface{})
-	response["apiVersion"] = 1.0
+	response["apiVersion"] = "1.0"
 	responseData := make(map[string]interface{})
-	responseData["client_id"] = appReg.ClientID
+	responseData["client_id"] = appReg.ID
 	response["data"] = responseData
 
 	outbytes, err := json.Marshal(response)

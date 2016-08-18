@@ -7,5 +7,4 @@ message ApplicationRegistrationCreated {
     string name = 2;
     string description = 3;
     int64 createTimestamp = 4;
-    string clientID = 5;
 }
