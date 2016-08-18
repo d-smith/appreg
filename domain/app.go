@@ -6,6 +6,8 @@ import (
 	"log"
 	"errors"
 	"github.com/golang/protobuf/proto"
+	"fmt"
+	"crypto/rand"
 )
 
 type ApplicationReg struct {
@@ -13,6 +15,7 @@ type ApplicationReg struct {
 	Name string
 	Description string
 	Created int64 //Unix time stamp serialized as an int64
+	ClientID string
 }
 
 const (
@@ -28,11 +31,18 @@ func NewApplicationReg(name, description string)(*ApplicationReg,error) {
 	appReg.Aggregate = goes.NewAggregate()
 	appReg.Version = 1
 
+	clientID, err := uuid()
+	if err != nil {
+		return nil,err
+	}
+
+
 	appRegCreated := ApplicationRegistrationCreated{
 		AggregateId: appReg.ID,
 		Name: name,
 		Description: description,
 		CreateTimestamp: time.Now().UnixNano(),
+		ClientID: clientID,
 	}
 
 	appReg.Apply(
@@ -66,6 +76,7 @@ func (ar *ApplicationReg) handleApplicationRegistrationCreated(event Application
 	ar.Name = event.Name
 	ar.Description = event.Description
 	ar.Created = event.CreateTimestamp
+	ar.ClientID = event.ClientID
 }
 
 func (ar *ApplicationReg) Store(eventStore goes.EventStore) error {
@@ -123,4 +134,15 @@ func marshallEvents(events []goes.Event) ([]goes.Event, error) {
 
 func marshallCreate(create ApplicationRegistrationCreated) ([]byte, error) {
 	return proto.Marshal(&create)
+}
+
+func uuid() (string, error) {
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%X-%X-%X-%X-%X", b[0:4], b[4:6], b[6:8], b[8:10], b[10:]), nil
+
 }
