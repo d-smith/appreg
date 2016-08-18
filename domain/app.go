@@ -1,23 +1,23 @@
 package domain
 
 import (
-	"github.com/xtraclabs/goes"
-	"time"
-	"log"
 	"errors"
-	"github.com/golang/protobuf/proto"
 	"fmt"
+	"github.com/golang/protobuf/proto"
+	"github.com/xtraclabs/goes"
+	"log"
+	"time"
 )
 
 type ApplicationReg struct {
 	*goes.Aggregate
-	Name string
+	Name        string
 	Description string
-	Created int64 //Unix time stamp serialized as an int64
+	Created     int64 //Unix time stamp serialized as an int64
 }
 
 func (ar *ApplicationReg) String() string {
-	ts := time.Unix(0,ar.Created).Format(time.RFC3339Nano)
+	ts := time.Unix(0, ar.Created).Format(time.RFC3339Nano)
 	return fmt.Sprintf("ID: %s, Name: %s, Description: %s, Created: %s",
 		ar.ID, ar.Name, ar.Description, ts)
 }
@@ -30,21 +30,21 @@ var (
 	ErrUnknownType = errors.New("Unknown event type")
 )
 
-func NewApplicationReg(name, description string)(*ApplicationReg,error) {
+func NewApplicationReg(name, description string) (*ApplicationReg, error) {
 	var appReg = new(ApplicationReg)
 	appReg.Aggregate = goes.NewAggregate()
 	appReg.Version = 1
 
 	appRegCreated := ApplicationRegistrationCreated{
-		AggregateId: appReg.ID,
-		Name: name,
-		Description: description,
+		AggregateId:     appReg.ID,
+		Name:            name,
+		Description:     description,
 		CreateTimestamp: time.Now().UnixNano(),
 	}
 
 	appReg.Apply(
 		goes.Event{
-			Source: appReg.ID,
+			Source:  appReg.ID,
 			Version: appReg.Version,
 			Payload: appRegCreated,
 		})
@@ -55,7 +55,7 @@ func NewApplicationReg(name, description string)(*ApplicationReg,error) {
 func NewApplicationRegFromHistory(events []goes.Event) *ApplicationReg {
 
 	log.Printf("New application reg from history - %d events\n", len(events))
-	appReg := new (ApplicationReg)
+	appReg := new(ApplicationReg)
 	appReg.Aggregate = goes.NewAggregate()
 
 	unmarshalledEvents, err := unmarshallEvents(events)
@@ -72,20 +72,18 @@ func NewApplicationRegFromHistory(events []goes.Event) *ApplicationReg {
 	return appReg
 }
 
-
 func (ar *ApplicationReg) Apply(event goes.Event) {
 	ar.Route(event)
 	ar.Events = append(ar.Events, event)
 }
 
-
-func (ar *ApplicationReg)Route(event goes.Event) {
+func (ar *ApplicationReg) Route(event goes.Event) {
 	event.Version = ar.Version
 	switch event.Payload.(type) {
 	case ApplicationRegistrationCreated:
 		ar.handleApplicationRegistrationCreated(event.Payload.(ApplicationRegistrationCreated))
-		default:
-			log.Printf("unexpected type handled: %t",event.Payload)
+	default:
+		log.Printf("unexpected type handled: %t", event.Payload)
 	}
 }
 

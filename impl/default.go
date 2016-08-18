@@ -1,19 +1,25 @@
 package impl
 
 import (
+	"database/sql"
 	"encoding/json"
+	"fmt"
+	"github.com/gorilla/mux"
+	_ "github.com/mattn/go-oci8"
+	"github.com/xtraclabs/appreg/domain"
+	"github.com/xtraclabs/oraeventstore"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"github.com/xtraclabs/appreg/domain"
-	"github.com/xtraclabs/oraeventstore"
 	"os"
 	"strings"
-	"github.com/gorilla/mux"
 	"time"
 )
 
-var eventStore *oraeventstore.OraEventStore
+var (
+	eventStore *oraeventstore.OraEventStore
+	db         *sql.DB
+)
 
 type Default struct {
 }
@@ -47,7 +53,7 @@ func init() {
 	}
 
 	if len(configErrors) != 0 {
-		log.Fatal(strings.Join(configErrors,"\n"))
+		log.Fatal(strings.Join(configErrors, "\n"))
 	}
 
 	var err error
@@ -56,9 +62,23 @@ func init() {
 		log.Fatalf("Error connecting to oracle: %s", err.Error())
 	}
 
+	connectStr := fmt.Sprintf("%s/%s@//%s:%s/%s",
+		user, password, dbhost, dbPort, dbSvc)
+
+	db, err = sql.Open("oci8", connectStr)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	//Are we really in an ok state for starters?
+	err = db.Ping()
+	if err != nil {
+		log.Fatalf("Error connecting to oracle: %s", err.Error())
+	}
+
 }
 
-func buildGetByIdResponse(appReg *domain.ApplicationReg) ([]byte,error) {
+func buildGetByIdResponse(appReg *domain.ApplicationReg) ([]byte, error) {
 	response := make(map[string]interface{})
 	response["appVersion"] = "1.0"
 
@@ -100,7 +120,6 @@ func ApplicationsClientIdGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write(out)
@@ -117,8 +136,44 @@ func ApplicationsClientIdSecretPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func ApplicationsGet(w http.ResponseWriter, r *http.Request) {
+
+	response := make(map[string]interface{})
+	response["apiVersion"] = "1.0"
+	var data []interface{}
+
+	rows, err := db.Query(`select client_id, name, created from app_summary order by name`)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	defer rows.Close()
+
+	var clientId, name string
+	var create time.Time
+
+	for rows.Next() {
+		rows.Scan(&clientId, &name, &create)
+
+		row := make(map[string]interface{})
+		row["name"] = name
+		row["clientId"] = clientId
+		row["created"] = create.Format(time.RFC3339Nano)
+
+		data = append(data, row)
+	}
+
+	response["data"] = data
+
+	out, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
+	w.Write(out)
 }
 
 func ApplicationsPost(w http.ResponseWriter, r *http.Request) {
@@ -149,9 +204,8 @@ func ApplicationsPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unable to extract description parameter from request payload", http.StatusInternalServerError)
 	}
 
-
 	log.Println("create app with name and desc", name, desc)
-	appReg,_ := domain.NewApplicationReg(name, desc)
+	appReg, _ := domain.NewApplicationReg(name, desc)
 	log.Println("storing...", appReg)
 
 	err = appReg.Store(eventStore)
@@ -159,7 +213,6 @@ func ApplicationsPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
 
 	response := make(map[string]interface{})
 	response["apiVersion"] = "1.0"
@@ -172,7 +225,6 @@ func ApplicationsPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
