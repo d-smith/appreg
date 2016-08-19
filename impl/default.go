@@ -57,7 +57,7 @@ func init() {
 	}
 
 	var err error
-	eventStore, err = oraeventstore.NewOraEventStore("esusr", "password", "xe.oracle.docker", "localhost", "1521")
+	eventStore, err = oraeventstore.NewOraEventStore(user, password, dbSvc, dbhost, dbPort)
 	if err != nil {
 		log.Fatalf("Error connecting to oracle: %s", err.Error())
 	}
