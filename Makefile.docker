@@ -1,0 +1,4 @@
+containerbin:
+	go get github.com/rjeczalik/pkgconfig/cmd/pkg-config
+	go get -v github.com/mattn/go-oci8
+	go build -o appreg
