@@ -1,3 +1,3 @@
 docker: 
-	docker build -t dasmith/appreg .
+	docker build -t xtracdev/appreg .
 
