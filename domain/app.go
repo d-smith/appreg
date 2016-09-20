@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/golang/protobuf/proto"
-	"github.com/xtraclabs/goes"
+	"github.com/xtracdev/goes"
 	"log"
 	"time"
 )
