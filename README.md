@@ -39,14 +39,3 @@ back on the native side if you want to run stuff there.
 After building the binary in the docker image, exit the shell then build
 the image via make.
 
-### Some Dependencies
-
-<pre>
-go get github.com/lib/pq
-go get -u github.com/golang/protobuf/protoc-gen-go
-go get github.com/gorilla/mux
-go get github.com/rjeczalik/pkgconfig/cmd/pkg-config
-go get github.com/mattn/go-oci8
-go get github.com/xtracdev/oraeventstore
-go get github.com/xtracdev/goes
-</pre>
