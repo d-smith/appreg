@@ -24,10 +24,7 @@ A Makefile has been supplied for this (Makefile.docker), which does
 the build. To run it:
 
 <pre>
-cd $GOPATH
-docker run --rm -it -v "$PWD":/go -w /go/src/github.com/xtraclabs xtracdev/goora bash
-cd appreg
-make -f Makefile.docker
+docker run --rm -v "$PWD":/go/src/github.com/xtraclabs/appreg -w /go/src/github.com/xtraclabs/appreg xtracdev/goora bash -c "make -f Makefile.docker"
 </pre>
 
 
@@ -37,5 +34,5 @@ stuff with the container native stuff, so you'll need to do a go get
 back on the native side if you want to run stuff there.
 
 After building the binary in the docker image, exit the shell then build
-the image via make.
+the image via make, then docker push it to dockerhub.com.
 
