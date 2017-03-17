@@ -56,18 +56,11 @@ func init() {
 		log.Fatal(strings.Join(configErrors, "\n"))
 	}
 
+	var connectStr = fmt.Sprintf("%s/%s@//%s:%s/%s", user, password, dbhost, dbPort, dbSvc)
 	var err error
-	eventStore, err = oraeventstore.NewOraEventStore(user, password, dbSvc, dbhost, dbPort)
-	if err != nil {
-		log.Fatalf("Error connecting to oracle: %s", err.Error())
-	}
-
-	connectStr := fmt.Sprintf("%s/%s@//%s:%s/%s",
-		user, password, dbhost, dbPort, dbSvc)
-
 	db, err = sql.Open("oci8", connectStr)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatalf("Error connecting to oracle: %s", err.Error())
 	}
 
 	//Are we really in an ok state for starters?
@@ -76,6 +69,10 @@ func init() {
 		log.Fatalf("Error connecting to oracle: %s", err.Error())
 	}
 
+	eventStore, err = oraeventstore.NewOraEventStore(db)
+	if err != nil {
+		log.Fatalf("Error connecting to oracle: %s", err.Error())
+	}
 }
 
 func buildGetByIdResponse(appReg *domain.ApplicationReg) ([]byte, error) {
@@ -85,7 +82,7 @@ func buildGetByIdResponse(appReg *domain.ApplicationReg) ([]byte, error) {
 	data := make(map[string]interface{})
 	data["name"] = appReg.Name
 	data["description"] = appReg.Description
-	data["client_id"] = appReg.ID
+	data["client_id"] = appReg.AggregateID
 
 	created := time.Unix(0, appReg.Created).Format(time.RFC3339Nano)
 	data["created"] = created
@@ -217,7 +214,7 @@ func ApplicationsPost(w http.ResponseWriter, r *http.Request) {
 	response := make(map[string]interface{})
 	response["apiVersion"] = "1.0"
 	responseData := make(map[string]interface{})
-	responseData["client_id"] = appReg.ID
+	responseData["client_id"] = appReg.AggregateID
 	response["data"] = responseData
 
 	outbytes, err := json.Marshal(response)

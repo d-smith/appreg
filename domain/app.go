@@ -19,7 +19,7 @@ type ApplicationReg struct {
 func (ar *ApplicationReg) String() string {
 	ts := time.Unix(0, ar.Created).Format(time.RFC3339Nano)
 	return fmt.Sprintf("ID: %s, Name: %s, Description: %s, Created: %s",
-		ar.ID, ar.Name, ar.Description, ts)
+		ar.AggregateID, ar.Name, ar.Description, ts)
 }
 
 const (
@@ -32,11 +32,11 @@ var (
 
 func NewApplicationReg(name, description string) (*ApplicationReg, error) {
 	var appReg = new(ApplicationReg)
-	appReg.Aggregate = goes.NewAggregate()
+	appReg.Aggregate,_ = goes.NewAggregate()
 	appReg.Version = 1
 
 	appRegCreated := ApplicationRegistrationCreated{
-		AggregateId:     appReg.ID,
+		AggregateId:     appReg.AggregateID,
 		Name:            name,
 		Description:     description,
 		CreateTimestamp: time.Now().UnixNano(),
@@ -44,7 +44,7 @@ func NewApplicationReg(name, description string) (*ApplicationReg, error) {
 
 	appReg.Apply(
 		goes.Event{
-			Source:  appReg.ID,
+			Source:  appReg.AggregateID,
 			Version: appReg.Version,
 			Payload: appRegCreated,
 		})
@@ -56,7 +56,7 @@ func NewApplicationRegFromHistory(events []goes.Event) *ApplicationReg {
 
 	log.Printf("New application reg from history - %d events\n", len(events))
 	appReg := new(ApplicationReg)
-	appReg.Aggregate = goes.NewAggregate()
+	appReg.Aggregate,_ = goes.NewAggregate()
 
 	unmarshalledEvents, err := unmarshallEvents(events)
 	if err != nil {
@@ -88,7 +88,7 @@ func (ar *ApplicationReg) Route(event goes.Event) {
 }
 
 func (ar *ApplicationReg) handleApplicationRegistrationCreated(event ApplicationRegistrationCreated) {
-	ar.ID = event.AggregateId
+	ar.AggregateID = event.AggregateId
 	ar.Name = event.Name
 	ar.Description = event.Description
 	ar.Created = event.CreateTimestamp
@@ -103,7 +103,7 @@ func (ar *ApplicationReg) Store(eventStore goes.EventStore) error {
 	log.Println("Storing ", len(ar.Events), " events.")
 
 	aggregateToStore := &goes.Aggregate{
-		ID:      ar.ID,
+		AggregateID:      ar.AggregateID,
 		Version: ar.Version,
 		Events:  marshalled,
 	}
